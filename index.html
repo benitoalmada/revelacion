@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Globos Interactivos</title>
+
+<!-- Librerías -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" defer></script>
+
+<style>
+* {
+  font-family: system-ui, sans-serif;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 20px;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: #f3f3f3;
+}
+
+/* =====================
+   PANEL IZQUIERDO
+===================== */
+.palette {
+  width: 240px;
+  padding: 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: grab;
+}
+
+.option img {
+  width: 70px;
+  height: 70px;
+}
+
+/* =====================
+   TOOLBAR
+===================== */
+.toolbar {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.toolbar button {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 15px;
+  cursor: pointer;
+  background: white;
+  border: none;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+}
+
+.toolbar button:hover {
+  background: #efefef;
+}
+
+/* =====================
+   CONTADOR
+===================== */
+#counter {
+  margin-top: 4px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* =====================
+   TABLERO
+===================== */
+#board {
+  position: relative;
+  width: 1100px;
+  height: 1000px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+#board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("fondo-cuadro.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  pointer-events: none;
+}
+
+#lines-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#nudo {
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* =====================
+   GLOBOS
+===================== */
+.placed-item {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  animation: popIn 0.35s ease-out;
+}
+
+.placed-item img {
+  width: 100px;
+  height: 100px;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));
+}
+
+.name-input {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 18px;
+}
+
+.name-label {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.delete-btn {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: white;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+}
+
+@keyframes popIn {
+  0% { transform: translate(-50%, -50%) scale(0.3); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* =====================
+   MODO VERTICAL
+===================== */
+@media (orientation: portrait) {
+  body {
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+  }
+
+  .palette {
+    width: 98%;
+    flex-direction: row;
+    justify-content: center;
+    gap: 15px;
+  }
+
+  .palette h3 { display: none; }
+
+  #board {
+    width: 95vw !important;
+    height: 150vw !important;
+  }
+}
+
+/* =====================
+   POPUP GANADOR
+===================== */
+#popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+}
+
+#popup-content {
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  text-align: center;
+  max-width: 90%;
+  animation: popupBounce 0.6s ease-out;
+}
+
+#popup-content img {
+  width: 120px;
+  margin-top: 20px;
+}
+
+#popup button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  background: #efefef;
+}
+
+/* ANIMACIÓN BOUNCE */
+@keyframes popupBounce {
+  0%   { transform: scale(0.3); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  80%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- AUDIO -->
+<audio id="audio-nena" src="team-nena.mp3"></audio>
+<audio id="audio-nene" src="team-nene.mp3"></audio>
+<audio id="audio-empate" src="team-empate.mp3"></audio>
+
+<!-- PANEL -->
+<aside class="palette">
+  <h3>Elige un globo</h3>
+
+  <div class="option" draggable="true" data-type="pink">
+    <img src="globo-rosa.png">
+    <span>Globo rosa</span>
+  </div>
+
+  <div class="option" draggable="true" data-type="blue">
+    <img src="globo-celeste.png">
+    <span>Globo celeste</span>
+  </div>
+</aside>
+
+<!-- ZONA CENTRAL -->
+<div>
+  <div class="toolbar">
+    <button id="download-btn">📥 Descargar</button>
+    <button id="print-btn">🖨 Imprimir póster</button>
+    <button id="clear-btn">🗑 Reiniciar todo</button>
+  </div>
+
+  <div id="counter">Rosa: 0 | Celeste: 0</div>
+
+  <div id="board">
+    <img id="nudo" src="foto.png">
+
+    <svg id="lines-layer" viewBox="0 0 1100 1000">
+      <line x1="550" y1="600" x2="250" y2="200" stroke="black" stroke-width="3"/>
+      <line x1="550" y1="600" x2="350" y2="180" stroke="black" stroke-width="3"/>
+      <line x1="550" y1="600" x2="450" y2="150" stroke="black" stroke-width="3"/>
+      <line x1="550" y1="600" x2="550" y2="130" stroke="black" stroke-width="3"/>
+      <line x1="550" y1="600" x2="650" y2="150" stroke="black" stroke-width="3"/>
+      <line x1="550" y1="600" x2="750" y2="180" stroke="black" stroke-width="3"/>
+      <line x1="550" y1="600" x2="850" y2="200" stroke="black" stroke-width="3"/>
+    </svg>
+  </div>
+</div>
+
+<!-- POPUP GANADOR -->
+<div id="popup">
+  <div id="popup-content">
+    <h2 id="popup-title"></h2>
+    <img id="popup-img" src="">
+    <button onclick="closePopup()">Cerrar</button>
+  </div>
+</div>
+
+<script>
+/* ============================================
+   VARIABLES Y AUDIO
+============================================ */
+let countPink = 0;
+let countBlue = 0;
+const TOTAL_REQUIRED = 17;
+let balloonsData = [];
+let lastBalloonIndex = null;
+let winnerEvaluated = false;
+
+const audioNena = document.getElementById("audio-nena");
+const audioNene = document.getElementById("audio-nene");
+const audioEmpate = document.getElementById("audio-empate");
+
+function stopAllAudio() {
+  [audioNena, audioNene, audioEmpate].forEach(a => {
+    a.pause();
+    a.currentTime = 0;
+  });
+}
+
+/* ============================================
+   CONFETI INFINITO
+============================================ */
+let confettiInterval = null;
+
+function startConfettiLoop() {
+  stopConfettiLoop();
+  confettiInterval = setInterval(() => {
+    confetti({
+      particleCount: 20,
+      angle: 90,
+      spread: 60,
+      origin: { x: Math.random(), y: 0 }
+    });
+  }, 350);
+}
+
+function stopConfettiLoop() {
+  if (confettiInterval) {
+    clearInterval(confettiInterval);
+    confettiInterval = null;
+  }
+}
+
+/* ============================================
+   DRAG & SNAP
+============================================ */
+const palette = document.querySelector(".palette");
+const board = document.getElementById("board");
+
+const imageForType = {
+  pink: "globo-rosa.png",
+  blue: "globo-celeste.png"
+};
+
+palette.addEventListener("dragstart", e => {
+  const opt = e.target.closest(".option");
+  if (!opt) return;
+  e.dataTransfer.setData("type", opt.dataset.type);
+});
+
+board.addEventListener("dragover", e => e.preventDefault());
+
+board.addEventListener("drop", e => {
+  e.preventDefault();
+  const type = e.dataTransfer.getData("type");
+  const rect = board.getBoundingClientRect();
+  handleDrop(e.clientX - rect.left, e.clientY - rect.top, type);
+});
+
+const lines = [
+  {x1:550,y1:600,x2:250,y2:200},
+  {x1:550,y1:600,x2:350,y2:180},
+  {x1:550,y1:600,x2:450,y2:150},
+  {x1:550,y1:600,x2:550,y2:130},
+  {x1:550,y1:600,x2:650,y2:150},
+  {x1:550,y1:600,x2:750,y2:180},
+  {x1:550,y1:600,x2:850,y2:200},
+];
+
+function findClosestPoint(px, py, tolerance) {
+  let best = null, bestDist = Infinity;
+
+  for (let l of lines) {
+    const dx = l.x2 - l.x1;
+    const dy = l.y2 - l.y1;
+    const len2 = dx*dx + dy*dy;
+    let t = ((px-l.x1)*dx + (py-l.y1)*dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const cx = l.x1 + dx*t;
+    const cy = l.y1 + dy*t;
+    const dist = Math.hypot(px-cx, py-cy);
+
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = {x: cx, y: cy};
+    }
+  }
+
+  return bestDist <= tolerance ? best : null;
+}
+
+function handleDrop(px, py, type) {
+  const snapped = findClosestPoint(px, py, 40);
+  if (!snapped) return alert("Debe colocarlo sobre una línea");
+  placeItem(snapped.x, snapped.y, type);
+}
+
+/* ============================================
+   CREAR GLOBO
+============================================ */
+function placeItem(x, y, type) {
+
+  const c = document.createElement("div");
+  c.className = "placed-item";
+  c.style.left = x + "px";
+  c.style.top = y + "px";
+
+  const img = document.createElement("img");
+  img.src = imageForType[type];
+
+  const input = document.createElement("input");
+  input.className = "name-input";
+  input.placeholder = "Nombre...";
+
+  /* Guardar info */
+  const index = balloonsData.length;
+  balloonsData.push({ type, x, y, name: "", deleted: false });
+  lastBalloonIndex = index;
+
+  input.addEventListener("blur", () => {
+    const value = input.value.trim();
+    balloonsData[index].name = value || "Sin nombre";
+
+    const label = document.createElement("div");
+    label.className = "name-label";
+    label.textContent = balloonsData[index].name;
+
+    c.removeChild(input);
+    c.appendChild(label);
+
+    /* MOSTRAR GANADOR DESPUÉS DE ESCRIBIR EL NOMBRE DEL #17 */
+    if (index === TOTAL_REQUIRED - 1 && !winnerEvaluated) {
+      winnerEvaluated = true;
+      showWinner();
+    }
+  });
+
+  const del = document.createElement("button");
+  del.className = "delete-btn";
+  del.textContent = "✕";
+  del.addEventListener("click", () => {
+    balloonsData[index].deleted = true;
+    if (type === "pink") countPink--;
+    if (type === "blue") countBlue--;
+    updateCounter();
+    c.remove();
+  });
+
+  /* Contadores */
+  if (type === "pink") countPink++;
+  if (type === "blue") countBlue++;
+  updateCounter();
+
+  c.appendChild(del);
+  c.appendChild(img);
+  c.appendChild(input);
+  board.appendChild(c);
+
+  input.focus();
+}
+
+function updateCounter() {
+  document.getElementById("counter").innerText =
+    `Rosa: ${countPink} | Celeste: ${countBlue}`;
+}
+
+/* ============================================
+   POPUP GANADOR CON ANIMACIÓN Y CONFETI
+============================================ */
+function showWinner() {
+
+  let title = "";
+  let img = "";
+  let type = "";
+
+  if (countPink > countBlue) {
+    title = "GANÓ EL TEAM NENA 💗";
+    img = "globo-rosa.png";
+    type = "nena";
+  } else if (countBlue > countPink) {
+    title = "GANÓ EL TEAM NENE 💙";
+    img = "globo-celeste.png";
+    type = "nene";
+  } else {
+    title = "AMBOS TEAMS SON IGUALES 🤍";
+    img = "";
+    type = "empate";
+  }
+
+  document.getElementById("popup-title").textContent = title;
+
+  const popupImg = document.getElementById("popup-img");
+  popupImg.style.display = img ? "block" : "none";
+  if (img) popupImg.src = img;
+
+  document.getElementById("popup").style.display = "flex";
+
+  /* Música */
+  stopAllAudio();
+  if (type === "nena") audioNena.play().catch(()=>{});
+  if (type === "nene") audioNene.play().catch(()=>{});
+  if (type === "empate") audioEmpate.play().catch(()=>{});
+
+  /* Confeti explosión inicial */
+  confetti({
+    particleCount: 180,
+    spread: 90,
+    origin: { y: 0.6 }
+  });
+
+  /* Confeti infinito */
+  startConfettiLoop();
+}
+
+/* ============================================
+   CERRAR POPUP SIN REINICIAR
+============================================ */
+function closePopup() {
+  document.getElementById("popup").style.display = "none";
+  stopAllAudio();
+  stopConfettiLoop();
+}
+
+/* ============================================
+   REINICIAR TODO
+============================================ */
+document.getElementById("clear-btn").addEventListener("click", () => {
+  document.querySelectorAll(".placed-item").forEach(e => e.remove());
+  countPink = 0;
+  countBlue = 0;
+  balloonsData = [];
+  lastBalloonIndex = null;
+  winnerEvaluated = false;
+  updateCounter();
+  stopAllAudio();
+  stopConfettiLoop();
+});
+
+/* ============================================
+   DESCARGAR PNG
+============================================ */
+document.getElementById("download-btn").addEventListener("click", () => {
+  html2canvas(board, { backgroundColor: null }).then(canvas => {
+    const link = document.createElement("a");
+    link.download = "cuadro-final.png";
+    link.href = canvas.toDataURL();
+    link.click();
+  });
+});
+
+/* ============================================
+   IMPRIMIR
+============================================ */
+document.getElementById("print-btn").addEventListener("click", () => {
+  window.print();
+});
+</script>
+
+</body>
+</html>
